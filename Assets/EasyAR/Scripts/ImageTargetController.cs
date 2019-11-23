@@ -44,6 +44,7 @@ public class ImageTargetController : MonoBehaviour
 
     [HideInInspector]
     public GameObject qrUi;
+    public bool isPlaying = false;
     public bool isTracking=false;
 
 
@@ -185,11 +186,12 @@ public class ImageTargetController : MonoBehaviour
     
     private void Update()
     {
+        isPlaying = overallTime >= initialTime && overallTime <= initialTime + duration;
         if (target != null)
         {
             var target = this.target as ImageTarget;
         }
-        if (overallTime >= initialTime && overallTime <= initialTime + duration)
+        if (isPlaying)
         {
             currentTime = overallTime - initialTime;
             qrUi.SetActive(!isTracking);
@@ -227,8 +229,10 @@ public class ImageTargetController : MonoBehaviour
         {
             transform.GetChild(i).gameObject.SetActive(false);
         }
+
         isTracking = false;
-        qrUi.SetActive(true);
+        if (isPlaying)
+            qrUi.SetActive(true);
     }
     
     public void OnFound()

@@ -1,0 +1,27 @@
+{
+    "videoPrincipal":"main.mp4",
+    "hologramas":[
+        {
+            "video":"cura.webm",
+            "marcador":"morado.jpg",
+            "inicio":"27:54",
+            "duracion":"00:49",
+            "ancho":"",
+            "alto":"",
+            "pos_x":"",
+            "pos_y":"",
+            "pos_z":""
+        },
+        {
+            "video":"frances.webm",
+            "marcador":"naranja.jpg",
+            "inicio":"31:47",
+            "duracion":"02:29",
+            "ancho":"",
+            "alto":"",
+            "pos_x":"",
+            "pos_y":"",
+            "pos_z":""
+        }
+    ]
+}

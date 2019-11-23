@@ -24,22 +24,26 @@ public class Manager : MonoBehaviour
     public GameObject waitMessage;
     public GameObject qrUi;
 
+    [Header("Configuración de Conexión")]
+    public GConfiguration globalConfiguration;
+
     [Header("Otros")]
     public double time;
     bool begin = false;
     bool prepared = false;
+    
 
     List<ImageTargetController> targetControllers = new List<ImageTargetController>();
     List<ImageTargetController> dispose = new List<ImageTargetController>();
 
     [Serializable]
-    class Status
+    public class Status
     {
         public bool begin;
         public int readyDevices;
     }
     [Serializable]
-     class Hologram
+    public class Hologram
     {
         public string video;
         public string marcador;
@@ -52,17 +56,23 @@ public class Manager : MonoBehaviour
         public float pos_z;
     }
     [Serializable]
-     class Configuration
+    public class Configuration
     {
         public string videoPrincipal;
         public Hologram[] hologramas;
+    }
+    [Serializable]
+    public class GConfiguration {
+        public string serverIp;
+        public string port;
     }
 
     
     public async void Awake(){               
 
-        Configuration configuration = null ;
-        configuration = await fetchConfiguration();
+        Configuration configuration = null ;        
+        globalConfiguration = await fetchGConfiguration();
+        configuration = await fetchConfiguration(globalConfiguration);
 
         if (configuration != null) {
             mainVideoPlayer.source = VideoSource.Url;
@@ -147,13 +157,19 @@ public class Manager : MonoBehaviour
         time = mainVideoPlayer.time;
     }
 
-    private async Task<Configuration> fetchConfiguration()
+    private async Task<Configuration> fetchConfiguration(GConfiguration gConfig)
     {
-        HttpWebRequest request = (HttpWebRequest)WebRequest.Create("http://192.168.0.60:8888/getConfiguration.php");
+        HttpWebRequest request = (HttpWebRequest)WebRequest.Create("http://"+gConfig.serverIp+":"+gConfig.port+"/getConfiguration.php");
         HttpWebResponse response = (HttpWebResponse)(await request.GetResponseAsync());
         StreamReader reader = new StreamReader(response.GetResponseStream());
         string jsonResponse = reader.ReadToEnd();
         return JsonUtility.FromJson<Configuration>(jsonResponse);
+    }
+
+    private async Task<GConfiguration> fetchGConfiguration()
+    {
+        string jsonResponse = File.ReadAllText(Application.streamingAssetsPath + "/Configuraciones/configuracion.json");        
+        return JsonUtility.FromJson<GConfiguration>(jsonResponse);
     }
 
     public async void onReady()
@@ -164,12 +180,12 @@ public class Manager : MonoBehaviour
         
         response.begin = false;
         response.readyDevices = 0;
-        await setReady();
+        await setReady(globalConfiguration);
         waitMessage.SetActive(true);
         readyButton.SetActive(false);
         while (!response.begin)
         {
-            response = await fetchStatus();
+            response = await fetchStatus(globalConfiguration);
             await Task.Delay(250);
         }
         //In order to keep everybody in sync it was decided not to use a different scene to avoid loading time loss.
@@ -182,8 +198,9 @@ public class Manager : MonoBehaviour
         //poll video time in order to get AR video going.
     }
 
-    private async Task<Status> fetchStatus(){
-        HttpWebRequest request = (HttpWebRequest)WebRequest.Create("http://192.168.0.60:8888/getStatus.php");
+    private async Task<Status> fetchStatus(GConfiguration gConfig)
+    {
+        HttpWebRequest request = (HttpWebRequest)WebRequest.Create("http://" + gConfig.serverIp + ":" + gConfig.port + "/getStatus.php");
         HttpWebResponse response = (HttpWebResponse)(await request.GetResponseAsync());
         StreamReader reader = new StreamReader(response.GetResponseStream());
         string jsonResponse = reader.ReadToEnd();
@@ -191,10 +208,11 @@ public class Manager : MonoBehaviour
         return JsonUtility.FromJson<Status>(jsonResponse);        
     }
 
-    private async Task setReady(){
+    private async Task setReady(GConfiguration gConfig)
+    {
         //This api call increments the amount of devices that are ready
         //the purpose is to show to the admin app how many devices are ready to run in order to decide if the experince should be started or not.
-        HttpWebRequest request = (HttpWebRequest)WebRequest.Create("http://192.168.0.60:8888/setReady.php");                
+        HttpWebRequest request = (HttpWebRequest)WebRequest.Create("http://" + gConfig.serverIp + ":" + gConfig.port + "/setReady.php");                
         HttpWebResponse response = (HttpWebResponse)(await request.GetResponseAsync());
         return;        
     }

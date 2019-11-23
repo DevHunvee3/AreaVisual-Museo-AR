@@ -35,10 +35,23 @@ public class ImageTargetController : MonoBehaviour
 
     private Image targetImage;
 
+    [Header("Custom Configs")]
+    public double initialTime = 0;  //Time in which this hologram should appear
+    public double overallTime = 0;  //Global Time played
+    public double duration = 0;     //Length of hologram
+    public double currentTime;      //Local Time played     
+    public UnityEngine.Video.VideoPlayer videoPlayer;
+
+    [HideInInspector]
+    public GameObject qrUi;
+    public bool isTracking=false;
+
+
     public Target Target()
     {
         return target;
     }
+
     public float TargetWidth
     {
         get
@@ -46,6 +59,7 @@ public class ImageTargetController : MonoBehaviour
             return transform.localScale.x;
         }
     }
+
     public float TargetHeight
     {
         get
@@ -168,17 +182,18 @@ public class ImageTargetController : MonoBehaviour
             Debug.Log("[EasyAR] Target size" + targetImage.width() + " " + targetImage.height());
         });
     }
-    public double currentTime;
-    public double videoLength;
+    
     private void Update()
     {
         if (target != null)
         {
             var target = this.target as ImageTarget;
         }
-        if (overallTime >= initialTime && overallTime <= initialTime + duration) {
+        if (overallTime >= initialTime && overallTime <= initialTime + duration)
+        {
             currentTime = overallTime - initialTime;
-        }        
+            qrUi.SetActive(!isTracking);
+        }
     }
 
     public void SetXFlip()
@@ -196,15 +211,13 @@ public class ImageTargetController : MonoBehaviour
             scale.x = -scale.x;
             transform.localScale = scale;
         }
-        if (currentTime < childPlayer.time - 1 || currentTime > childPlayer.time + 1)
+        if (currentTime < videoPlayer.time - 1 || currentTime > videoPlayer.time + 1)
         {
-            childPlayer.time = overallTime - initialTime;
+            videoPlayer.time = overallTime - initialTime;
         }
 
         transform.localScale = transform.localScale * TargetSize;
     }
-
-    
 
     public void OnLost()
     {
@@ -214,26 +227,31 @@ public class ImageTargetController : MonoBehaviour
         {
             transform.GetChild(i).gameObject.SetActive(false);
         }
+        isTracking = false;
+        qrUi.SetActive(true);
     }
-    public double overallTime = 0;
-    public double initialTime = 0;
-    public double duration = 0;
-    public UnityEngine.Video.VideoPlayer childPlayer;
+    
     public void OnFound()
-    {        
-        if(overallTime-initialTime > 0)
-        {            
+    {
+
+        if (overallTime - initialTime > 0)
+        {
+            isTracking = true;
             gameObject.SetActive(true);
-            childPlayer.gameObject.SetActive(true);
-            childPlayer.time = currentTime;
-            if (!childPlayer.isPlaying)
-                childPlayer.Play();            
+            videoPlayer.gameObject.SetActive(true);
+            videoPlayer.time = currentTime;
+            if (!videoPlayer.isPlaying)
+                videoPlayer.Play();
         }
-        childPlayer.time = currentTime;
+        else {
+            isTracking = false;
+        }
+        videoPlayer.time = currentTime;
     }
 
     private void OnDestroy()
     {
+        qrUi.SetActive(false);
         if (ImageTracker != null)
             ImageTracker.UnloadImageTarget(this, (target, status) => { Debug.Log("[EasyAR] Targtet name: " + target.name() + " Target runtimeID: " + target.runtimeID() + " load status: " + status); });
     }

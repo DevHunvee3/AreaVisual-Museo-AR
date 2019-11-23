@@ -10,19 +10,28 @@ using VideoPlayer = UnityEngine.Video.VideoPlayer;
 
 public class Manager : MonoBehaviour
 {    
-    public GameObject readyButton;
-    public GameObject WaitMessage;
-    public GameObject mainVideoPlayerObject;
+    [Header("Configuración General")]
+    public VideoPlayer mainVideoPlayer;    
     public Camera ARCamera;
     public GameObject AR;
+
+    [Header("Configuración de Marcadores")]
     public GameObject ImageTargetPrefab;
     public ImageTrackerBehaviour imageTrackerBehaviour;
-    private VideoPlayer _mainPlayer;
-    //private AudioSource _mainAudio;
-    
+
+    [Header("Configuración Gráfica")]
+    public GameObject readyButton;
+    public GameObject waitMessage;
+    public GameObject qrUi;
+
+    [Header("Otros")]
     public double time;
-    public bool Begin = false;
+    bool begin = false;
     bool prepared = false;
+
+    List<ImageTargetController> targetControllers = new List<ImageTargetController>();
+    List<ImageTargetController> dispose = new List<ImageTargetController>();
+
     [Serializable]
     class Status
     {
@@ -42,7 +51,6 @@ public class Manager : MonoBehaviour
         public float pos_y;
         public float pos_z;
     }
-
     [Serializable]
      class Configuration
     {
@@ -50,64 +58,60 @@ public class Manager : MonoBehaviour
         public Hologram[] hologramas;
     }
 
-    public double StringToSeconds(string s) {
-        string[] ss = s.Split(':');
-        if (ss.Length == 2) {
-            return (double.Parse(ss[0]) + (double.Parse(ss[1]) / 60f)) * 60;
-        }
-        return 0;
-    }
-
-    List<ImageTargetController> targetControllers = new List<ImageTargetController>();
-    public async void Awake(){
-        _mainPlayer = mainVideoPlayerObject.GetComponent<VideoPlayer>();
-        //_mainAudio = mainVideoPlayerObject.GetComponent<AudioSource>();
+    
+    public async void Awake(){               
 
         Configuration configuration = null ;
         configuration = await fetchConfiguration();
 
         if (configuration != null) {
-            _mainPlayer.source = VideoSource.Url;
-            _mainPlayer.url = Application.streamingAssetsPath + "/Videos/" + configuration.videoPrincipal;
-            _mainPlayer.Prepare();
-            _mainPlayer.SetDirectAudioMute(0, false);
+            mainVideoPlayer.source = VideoSource.Url;
+            mainVideoPlayer.url = Application.streamingAssetsPath + "/Videos/" + configuration.videoPrincipal;
+            mainVideoPlayer.Prepare();
+            mainVideoPlayer.SetDirectAudioMute(0, false);
             foreach (Hologram hologram in configuration.hologramas)
             {
-                GameObject target = Instantiate<GameObject>(ImageTargetPrefab,AR.transform);
+                //Create new Target Object, Get target Player, and get TargetController
+                GameObject target = Instantiate(ImageTargetPrefab,AR.transform);
+                Transform targetTransform = target.transform.GetChild(0);
                 ImageTargetController targetController = target.GetComponent<ImageTargetController>();
+                VideoPlayer targetPlayer = targetController.videoPlayer;
                 
+                //Setup targetController
                 targetController.ImageTracker = imageTrackerBehaviour;
+                targetController.qrUi = qrUi;
                 targetController.TargetName = hologram.marcador;
                 targetController.TargetPath = "/Marcadores/" + hologram.marcador;
-                GameObject child = target.transform.GetChild(0).gameObject;
-                //configurar posicion relativa al marcador y tamaño segund configuraciones
-                VideoPlayer hologramPlayer = child.GetComponent<VideoPlayer>();
-                hologramPlayer.source = VideoSource.Url;
-                hologramPlayer.url = Application.streamingAssetsPath + "/Videos/" + hologram.video;                
-                
                 targetController.duration = StringToSeconds(hologram.duracion);                
                 targetController.initialTime = StringToSeconds(hologram.inicio);
+                //configurar posicion relativa al marcador y tamaño segund configuraciones - targetTransform.
+
+                //Setup targetPlayer
+                targetPlayer.source = VideoSource.Url;
+                targetPlayer.url = Application.streamingAssetsPath + "/Videos/" + hologram.video;
+                targetPlayer.Prepare();
+
                 targetControllers.Add(targetController);
             }
 
             readyButton.SetActive(false);
-            WaitMessage.SetActive(false);
+            waitMessage.SetActive(false);
             AR.SetActive(true);
         }
     }
-    public List<ImageTargetController> dispose;
+    
     public void Update(){
-        if(_mainPlayer.isPrepared && !prepared){
+        if(mainVideoPlayer.isPrepared && !prepared){
             prepared=true;
-            WaitMessage.SetActive(false);
+            waitMessage.SetActive(false);
             readyButton.SetActive(true);
         }
         bool arCameraOn = false;
-        if (targetControllers.Count > 0 && _mainPlayer.isPlaying)
+        if (targetControllers.Count > 0 && mainVideoPlayer.isPlaying)
         {
             foreach (ImageTargetController targetController in targetControllers)
             {
-                double overallTime = _mainPlayer.time;
+                double overallTime = mainVideoPlayer.time;
                 targetController.overallTime = overallTime;
                 if (overallTime >= targetController.initialTime && overallTime <= targetController.initialTime + targetController.duration)
                 {
@@ -140,7 +144,7 @@ public class Manager : MonoBehaviour
         {
             FastForward(10);
         }
-        time = _mainPlayer.time;
+        time = mainVideoPlayer.time;
     }
 
     private async Task<Configuration> fetchConfiguration()
@@ -161,7 +165,7 @@ public class Manager : MonoBehaviour
         response.begin = false;
         response.readyDevices = 0;
         await setReady();
-        WaitMessage.SetActive(true);
+        waitMessage.SetActive(true);
         readyButton.SetActive(false);
         while (!response.begin)
         {
@@ -170,9 +174,9 @@ public class Manager : MonoBehaviour
         }
         //In order to keep everybody in sync it was decided not to use a different scene to avoid loading time loss.
         readyButton.SetActive(false);
-        WaitMessage.SetActive(false);
-        _mainPlayer.enabled = true;
-        _mainPlayer.Play();
+        waitMessage.SetActive(false);
+        mainVideoPlayer.enabled = true;
+        mainVideoPlayer.Play();
         //_mainAudio.Play();
         //play the video
         //poll video time in order to get AR video going.
@@ -197,12 +201,23 @@ public class Manager : MonoBehaviour
 
     public void FastForward(int time)
     {
-        if (!_mainPlayer.isPrepared)
+        if (!mainVideoPlayer.isPrepared)
         {
             Debug.Log("Video Not Prepared.");
             return;
         }
-        _mainPlayer.time += 60*time; //+10 mins
+        mainVideoPlayer.time += 60*time; //+10 mins
         //_mainAudio.time += 60 * time;
     }
+
+    public double StringToSeconds(string s)
+    {
+        string[] ss = s.Split(':');
+        if (ss.Length == 2)
+        {
+            return (double.Parse(ss[0]) + (double.Parse(ss[1]) / 60f)) * 60;
+        }
+        return 0;
+    }
+
 }
